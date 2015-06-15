@@ -11,8 +11,10 @@
 #include <complex.h>
 #include <math.h>
 
-const int samp_rate=2400000, frequency=25e6, ndongles=4;
+const int samp_rate=2400000, frequency=25e6, ndongles=3;
 const int blocksize=2400000>>10<<10; /* make it aligned to 2^10 bytes */
+
+int donglesok=0;
 
 
 typedef uint8_t samples_t;
@@ -63,15 +65,15 @@ void *dongle_f(void *arg) {
 	//CHECK1(rtlsdr_set_tuner_gain(dev, 0));
 	CHECK1(rtlsdr_reset_buffer(dev));
 
-	//pthread_mutex_lock(&dongle_m);
-	sem_post(&dongle_sem);
 	fprintf(stderr, "Initialized %d\n", ds->id);
 	
+	donglesok++;
 	for(;;) {
 		int task;
 		pthread_mutex_lock(&dongle_m);
 		if(dongle_task == DONGLE_EXIT)
-			break;
+			break; 
+		sem_post(&dongle_sem);
 		pthread_cond_wait(&dongle_c, &dongle_m);
 		task = dongle_task;
 		pthread_mutex_unlock(&dongle_m);
@@ -81,24 +83,22 @@ void *dongle_f(void *arg) {
 			n_read = 0;
 			errno = 0;
 			CHECK2(ret = rtlsdr_read_sync(dev, ds->buffer, blocksize, &n_read));
-			sem_post(&dongle_sem);
 			if(ret < 0) {
 			} else if(n_read < blocksize) {
 				fprintf(stderr, "Short read %d: %d/%d\n", ds->id, n_read, blocksize);
 			} else {
 				fprintf(stderr, "Read %d\n", ds->id);
 			}
-		}
-		if(task == DONGLE_EXIT)
+		} else if(task == DONGLE_EXIT)
 			break;
 	}
+	donglesok--;
 
 	err:
 	fprintf(stderr, "Exiting %d\n", ds->id);
-	//pthread_mutex_unlock(&dongle_m);
 	if(dev)
 		CHECK2(rtlsdr_close(dev));
-	do_exit = 1;
+	sem_post(&dongle_sem);
 	return NULL;
 }
 
@@ -129,6 +129,7 @@ int initdongles() {
 	pthread_cond_init(&dongle_c, NULL);
 	sem_init(&dongle_sem, 0, 0);
 
+	donglesok = 0;
 	dongles = malloc(sizeof(struct dongle_struct) * ndongles);
 	for(di = 0; di < ndongles; di++) {
 		struct dongle_struct *d = &dongles[di];
@@ -147,7 +148,10 @@ int initdongles() {
 	
 	for(di=0; di < ndongles; di++)
 		sem_wait(&dongle_sem);
-	fprintf(stderr, "All dongles initialized\n");
+	if(donglesok == ndongles)
+		fprintf(stderr, "All dongles initialized\n");
+	else
+		fprintf(stderr, "%d/%d dongles initialized\n", donglesok, ndongles);
 	
 	return 0;
 }
@@ -160,7 +164,7 @@ int readdongles() {
 	pthread_cond_broadcast(&dongle_c);
 	pthread_mutex_unlock(&dongle_m);
 
-	for(di=0; di < ndongles; di++)
+	for(di=0; di < /*ndongles*/donglesok; di++)
 		sem_wait(&dongle_sem);
 	fprintf(stderr, "Read all\n");
 	
