@@ -1,9 +1,10 @@
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include <semaphore.h>
 #include "dongles.h"
 
-static int ndongles=0, samprate=0, frequency=0, blocksize=0, gain=0;
+static int ndongles=0, samprate=0, frequency=0, gain=0;
 static volatile int donglesok=0;
 
 static pthread_cond_t  dongle_c;
@@ -33,7 +34,6 @@ struct dongle_struct *dongles;
 static void *dongle_f(void *arg) {
 	struct dongle_struct *ds = arg;
 	rtlsdr_dev_t *dev = NULL;
-	int blocksize = ds->blocksize, n_read = 0;
 
 	fprintf(stderr, "Initializing %d\n", ds->id);
 	CHECK1(rtlsdr_open(&dev, ds->id));
@@ -60,6 +60,7 @@ static void *dongle_f(void *arg) {
 
 		if(task == DONGLE_READ) {
 			int ret;
+			int blocksize = ds->blocksize, n_read = 0;
 			n_read = 0;
 			errno = 0;
 			CHECK2(ret = rtlsdr_read_sync(dev, ds->buffer, blocksize, &n_read));
@@ -83,10 +84,9 @@ static void *dongle_f(void *arg) {
 }
 
 
-int coherent_init(int init_ndongles, int init_blocksize, int init_samprate, int init_frequency, int init_gain) {
+int coherent_init(int init_ndongles, int init_samprate, int init_frequency, int init_gain) {
 	int di;
 	ndongles = init_ndongles;
-	blocksize = init_blocksize;
 	samprate = init_samprate;
 	frequency = init_frequency;
 	gain = init_gain;
@@ -100,13 +100,6 @@ int coherent_init(int init_ndongles, int init_blocksize, int init_samprate, int 
 		struct dongle_struct *d = &dongles[di];
 		memset(d, 0, sizeof(struct dongle_struct));
 		d->id = di;
-		d->blocksize = blocksize;
-		d->buffer = malloc(blocksize);
-#ifdef DEBUGFILES
-		{char t[32];
-		sprintf(t, "d%02d", di);
-		d->file = fopen(t, "wb");}
-#endif
 	}
 	for(di=0; di < ndongles; di++)
 		pthread_create(&dongles[di].dongle_t, NULL, dongle_f, &dongles[di]);
@@ -122,14 +115,19 @@ int coherent_init(int init_ndongles, int init_blocksize, int init_samprate, int 
 }
 
 
-int coherent_read() {
+int coherent_read(int blocksize, samples_t **buffers) {
 	int di;
+	for(di=0; di < ndongles; di++) {
+		dongles[di].blocksize = blocksize;
+		dongles[di].buffer = buffers[di];
+	}
+
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_READ;
 	pthread_cond_broadcast(&dongle_c);
 	pthread_mutex_unlock(&dongle_m);
 
-	for(di=0; di < /*ndongles*/donglesok; di++)
+	for(di=0; di < donglesok; di++)
 		sem_wait(&dongle_sem);
 	fprintf(stderr, "Read all\n");
 	

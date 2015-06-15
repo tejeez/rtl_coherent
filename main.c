@@ -1,5 +1,6 @@
 #include "dongles.h"
 #include <signal.h>
+#include <stdlib.h>
 
 volatile int do_exit = 0;
 static void sighandler(int signum) {
@@ -18,21 +19,28 @@ static void initsignals() {
 }
 
 int main() {
-	int i = 0;
-	int ndongles = 3;
+	int ndongles = 3, blocksize = 2400000>>10<<10;
+	int i = 0, di;
+	samples_t **buffers;
+	FILE **files;
 	initsignals();
 
-	coherent_init(ndongles, 2400000>>10<<10, 2400000, 25e6, 100);
+	buffers = malloc(ndongles * sizeof(*buffers));
+	files = malloc(ndongles * sizeof(*files));
+	for(di=0; di < ndongles; di++) {
+		char t[32];
+		buffers[di] = malloc(blocksize * sizeof(**buffers));
+		sprintf(t, "d%02d", di);
+		files[di] = fopen(t, "wb");
+	}
+
+	coherent_init(ndongles, 2400000, 25e6, 100);
 
 	while(do_exit == 0 && i++<2) {
-		coherent_read();
-#ifdef DEBUGFILES
-		int di;
+		coherent_read(blocksize, buffers);
 		for(di = 0; di < ndongles; di++) {
-			struct dongle_struct *d = &dongles[di];
-			fwrite(d->buffer, d->blocksize, 1, d->file);
+			fwrite(buffers[di], blocksize, 1, files[di]);
 		}
-#endif
 	}
 
 	coherent_exit();
