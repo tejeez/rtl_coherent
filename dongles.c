@@ -1,39 +1,18 @@
 #include <errno.h>
-#include <signal.h>
 #include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
-#include <pthread.h>
 #include <semaphore.h>
-#include <rtl-sdr.h>
-#include <complex.h>
-#include <math.h>
+#include "dongles.h"
 
-const int samp_rate=2400000, frequency=25e6, ndongles=3;
-const int blocksize=2400000>>10<<10; /* make it aligned to 2^10 bytes */
+static int ndongles=0, samprate=0, frequency=0, blocksize=0, gain=0;
+static volatile int donglesok=0;
 
-int donglesok=0;
+static pthread_cond_t  dongle_c;
+static pthread_mutex_t dongle_m;
+static sem_t dongle_sem;
 
-
-typedef uint8_t samples_t;
-struct dongle_struct {
-	int id, blocksize;
-	samples_t *buffer;
-	FILE *file;
-	rtlsdr_dev_t *dev;
-	pthread_t dongle_t, control_t;
-};
-struct dongle_struct *dongles;
-
-pthread_cond_t  dongle_c;
-pthread_mutex_t dongle_m;
-sem_t dongle_sem;
-
-static volatile int do_exit = 0;
 static volatile enum {DONGLE_NOTHING, DONGLE_READ, DONGLE_EXIT} dongle_task = DONGLE_NOTHING;
 
+struct dongle_struct *dongles;
 
 /* http://stackoverflow.com/questions/6932401/elegant-error-checking */
 #define CHECK1(x) do { \
@@ -51,7 +30,7 @@ static volatile enum {DONGLE_NOTHING, DONGLE_READ, DONGLE_EXIT} dongle_task = DO
 	} \
 } while (0)
 
-void *dongle_f(void *arg) {
+static void *dongle_f(void *arg) {
 	struct dongle_struct *ds = arg;
 	rtlsdr_dev_t *dev = NULL;
 	int blocksize = ds->blocksize, n_read = 0;
@@ -59,10 +38,11 @@ void *dongle_f(void *arg) {
 	fprintf(stderr, "Initializing %d\n", ds->id);
 	CHECK1(rtlsdr_open(&dev, ds->id));
 	ds->dev = dev;
-	CHECK1(rtlsdr_set_sample_rate(dev, samp_rate));
+	CHECK1(rtlsdr_set_sample_rate(dev, samprate));
+	CHECK1(rtlsdr_set_dithering(dev, 0));
 	CHECK1(rtlsdr_set_center_freq(dev, frequency));
-	CHECK1(rtlsdr_set_tuner_gain_mode(dev, 0));
-	//CHECK1(rtlsdr_set_tuner_gain(dev, 0));
+	CHECK1(rtlsdr_set_tuner_gain_mode(dev, 1));
+	CHECK1(rtlsdr_set_tuner_gain(dev, gain));
 	CHECK1(rtlsdr_reset_buffer(dev));
 
 	fprintf(stderr, "Initialized %d\n", ds->id);
@@ -103,28 +83,13 @@ void *dongle_f(void *arg) {
 }
 
 
-static void sighandler(int signum) {
-	(void)signum;
-	do_exit = 1;
-}
-
-
-void initsignals() {
-	struct sigaction sigact;
-	sigact.sa_handler = sighandler;
-	sigemptyset(&sigact.sa_mask);
-	sigact.sa_flags = 0;
-	sigaction(SIGINT, &sigact, NULL);
-	sigaction(SIGTERM, &sigact, NULL);
-	sigaction(SIGQUIT, &sigact, NULL);
-	sigaction(SIGPIPE, &sigact, NULL);
-}
-
-
-#define DEBUGFILES
-
-int initdongles() {
+int coherent_init(int init_ndongles, int init_blocksize, int init_samprate, int init_frequency, int init_gain) {
 	int di;
+	ndongles = init_ndongles;
+	blocksize = init_blocksize;
+	samprate = init_samprate;
+	frequency = init_frequency;
+	gain = init_gain;
 	pthread_mutex_init(&dongle_m, NULL);
 	pthread_cond_init(&dongle_c, NULL);
 	sem_init(&dongle_sem, 0, 0);
@@ -153,11 +118,11 @@ int initdongles() {
 	else
 		fprintf(stderr, "%d/%d dongles initialized\n", donglesok, ndongles);
 	
-	return 0;
+	return donglesok;
 }
 
 
-int readdongles() {
+int coherent_read() {
 	int di;
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_READ;
@@ -172,7 +137,7 @@ int readdongles() {
 }
 
 
-int exitdongles() {
+int coherent_exit() {
 	int di;
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_EXIT;
@@ -187,25 +152,4 @@ int exitdongles() {
 	return 0;
 }
 
-
-int main() {
-	int i = 0;
-	initsignals();
-
-	initdongles();
-
-	while(do_exit == 0 && i++<2) {
-		readdongles();
-#ifdef DEBUGFILES
-		int di;
-		for(di = 0; di < ndongles; di++) {
-			struct dongle_struct *d = &dongles[di];
-			fwrite(d->buffer, d->blocksize, 1, d->file);
-		}
-#endif
-	}
-
-	exitdongles();
-	return 0;
-}
 

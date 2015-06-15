@@ -1,5 +1,6 @@
-test: dongles
-	./dongles
+test: main
+	./main
 
-dongles: dongles.c
-	gcc dongles.c -o dongles -Wall -Wextra -O3 -lm -lrtlsdr -lpthread
+main: dongles.c main.c
+	gcc dongles.c main.c -o main -Wall -Wextra -O3 -lm -lrtlsdr -lpthread
+
