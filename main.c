@@ -1,4 +1,5 @@
 #include "dongles.h"
+#include "synchronize.h"
 #include <signal.h>
 #include <stdlib.h>
 
@@ -20,17 +21,18 @@ static void initsignals() {
 
 int main(int argc, char *argv[]) {
 	int ndongles = 3, blocksize = 2400000>>10<<10;
-	int i = 0, di;
-	int readfromfile = 0, writetofile = 1;
+	int di;
+	int readfromfile = 0, writetofile = 0;
 	samples_t **buffers;
 	FILE **files;
 	if(argc >= 2) {
-		if(argv[1][0] == 'r') {
+		if(argv[1][0] == 'r')
 			readfromfile = 1;
-			writetofile = 0;
-		}
+		if(argv[1][0] == 'w')
+			writetofile = 1;
 	}
 	initsignals();
+	sync_init(ndongles, 16384);
 
 	buffers = malloc(ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));
@@ -39,19 +41,26 @@ int main(int argc, char *argv[]) {
 		buffers[di] = malloc(blocksize * sizeof(**buffers));
 		sprintf(t, "d%02d", di);
 		if(readfromfile || writetofile) {
-			files[di] = fopen(t, readfromfile ? "rb" : "wb");
+			if((files[di] = fopen(t, readfromfile ? "rb" : "wb")) == NULL) {
+				fprintf(stderr, "Could not open file\n");
+				goto fail;
+			}
 		}
 	}
 	if(readfromfile) {
-		for(di = 0; di < ndongles; di++) {
-			fread(buffers[di], blocksize, 1, files[di]);
+		for(;;) {
+			for(di = 0; di < ndongles; di++) {
+				if(fread(buffers[di], blocksize, 1, files[di]) == 0)
+					goto fail;
+			}
+			sync_block(blocksize, (void**)buffers);
 		}
-		/* do something with the signals */
 	} else {
 		coherent_init(ndongles, 2400000, 25e6, 200);
 
 		while(do_exit == 0 /*&& i++<2*/) {
 			coherent_read(blocksize, buffers);
+			sync_block(blocksize, (void**)buffers);
 			if(writetofile) {
 				for(di = 0; di < ndongles; di++) {
 					fwrite(buffers[di], blocksize, 1, files[di]);
@@ -61,6 +70,9 @@ int main(int argc, char *argv[]) {
 
 		coherent_exit();
 	}
+	fail:
+	sync_exit();
 	return 0;
 }
+
 

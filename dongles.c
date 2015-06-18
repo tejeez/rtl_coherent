@@ -147,7 +147,12 @@ int coherent_exit() {
 	
 	pthread_mutex_destroy(&dongle_m);
 	pthread_cond_destroy(&dongle_c);
+	/* TODO: free everything */
 	return 0;
 }
 
 
+int sync_exit() {
+	/* TODO: free everything */
+	return 0;
+}
