@@ -151,8 +151,3 @@ int coherent_exit() {
 	return 0;
 }
 
-
-int sync_exit() {
-	/* TODO: free everything */
-	return 0;
-}

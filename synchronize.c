@@ -1,6 +1,7 @@
 #include <complex.h>
 #include <fftw3.h>
 #include <stdint.h>
+#include <time.h>
 #include "synchronize.h"
 
 
@@ -25,8 +26,8 @@ int sync_init(int nreceivers_init, int corrlen_init) {
 		fft1in[i] = fft1out[i] = 0;
 		
 	arraysize = (nreceivers-1) * fftn;
-	fft2in  = fftwf_malloc(arraysize * sizeof(*fft1in));
-	fft2out = fftwf_malloc(arraysize * sizeof(*fft1out));
+	fft2in  = fftwf_malloc(arraysize * sizeof(*fft2in));
+	fft2out = fftwf_malloc(arraysize * sizeof(*fft2out));
 	for(i = 0; i < arraysize; i++)
 		fft2in[i] = fft2out[i] = 0;
 	
@@ -66,6 +67,7 @@ int sync_block(int blocksize, void **buffersv) {
 			f2i[i] = fft1out[i] * conjf(f1o[i]);
 	}
 	fftwf_execute(fft2plan);
+	printf("%d ",time(NULL));
 	for(ri = 1; ri < nreceivers; ri++) {
 		fftwf_complex *f2o = fft2out  + (ri-1) * fftn;
 		float maxmagsq = 0, phasedifference;
@@ -82,9 +84,16 @@ int sync_block(int blocksize, void **buffersv) {
 		}
 		if(maxi >= fftn/2) maxi -= fftn;
 		phasedifference = 57.2957795f * cargf(maxc);
-		fprintf(stderr, "%5d %E %4.1f   ", maxi, maxmagsq, phasedifference);
+		printf("%5d %E %6.2f   ", maxi, maxmagsq, phasedifference);
 	}
-	fprintf(stderr,"\n");
+	printf("\n");
+	fflush(stdout);
+	return 0;
+}
+
+
+int sync_exit() {
+	/* TODO: free everything */
 	return 0;
 }
 

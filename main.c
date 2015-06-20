@@ -20,7 +20,7 @@ static void initsignals() {
 }
 
 int main(int argc, char *argv[]) {
-	int ndongles = 3, blocksize = 2400000>>10<<10;
+	int ndongles = 3, blocksize = 1200000>>10<<10;
 	int di;
 	int readfromfile = 0, writetofile = 0;
 	samples_t **buffers;
@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
 			sync_block(blocksize, (void**)buffers);
 		}
 	} else {
-		coherent_init(ndongles, 2400000, 25e6, 200);
+		coherent_init(ndongles, 2400000, 400e6, 400);
 
-		while(do_exit == 0 /*&& i++<2*/) {
+		while(do_exit == 0) {
 			coherent_read(blocksize, buffers);
 			sync_block(blocksize, (void**)buffers);
 			if(writetofile) {
