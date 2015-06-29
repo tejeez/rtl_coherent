@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 			sync_block(blocksize, (void**)buffers);
 		}
 	} else {
-		coherent_init(ndongles, 2400000, 400e6, 400);
+		coherent_init(ndongles, 2400000, 40e6, 400);
 
 		while(do_exit == 0) {
 			coherent_read(blocksize, buffers);

@@ -122,6 +122,10 @@ int coherent_read(int blocksize, samples_t **buffers) {
 		dongles[di].buffer = buffers[di];
 	}
 
+	/* generate some dummy I2C traffic to trigger noise source */
+	rtlsdr_set_tuner_gain(dongles[0].dev, gain-50);
+	rtlsdr_set_tuner_gain(dongles[0].dev, gain);
+
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_READ;
 	pthread_cond_broadcast(&dongle_c);
