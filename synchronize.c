@@ -2,14 +2,16 @@
 #include <fftw3.h>
 #include <stdint.h>
 #include <time.h>
+#include <math.h>
 #include "synchronize.h"
 
 /* for fractional-sample resolution */
 #define CORRELATION_OVERSAMPLE 4
 
-
+#define NRECEIVERS_MAX 16
 static int nreceivers=0, corrlen=0, fft1n=0, fft2n=0;
 
+static int sync_debug = 1;
 
 fftwf_complex *fft1in, *fft1out, *fft2in, *fft2out;
 fftwf_plan fft1plan, fft2plan;
@@ -18,6 +20,7 @@ int sync_init(int nreceivers_init, int corrlen_init) {
 	int i, arraysize;
 	nreceivers = nreceivers_init;
 	corrlen = corrlen_init;
+	if(nreceivers > NRECEIVERS_MAX) return -1;
 	
 	/* half of fft input will be zero-padded */
 	fft1n = corrlen*2;
@@ -28,7 +31,7 @@ int sync_init(int nreceivers_init, int corrlen_init) {
 	fft1out = fftwf_malloc(arraysize * sizeof(*fft1out));
 	for(i = 0; i < arraysize; i++)
 		fft1in[i] = fft1out[i] = 0;
-		
+	
 	arraysize = (nreceivers-1) * fft2n;
 	fft2in  = fftwf_malloc(arraysize * sizeof(*fft2in));
 	fft2out = fftwf_malloc(arraysize * sizeof(*fft2out));
@@ -50,7 +53,7 @@ int sync_init(int nreceivers_init, int corrlen_init) {
 }
 
 
-int sync_block(int blocksize, void **buffersv) {
+int sync_block(int blocksize, void **buffersv, float *timediffs, float *phasediffs) {
 	int ri, i;
 	csample_t **buffers = (csample_t**)buffersv;
 	if(blocksize < corrlen) return -1;
@@ -76,7 +79,11 @@ int sync_block(int blocksize, void **buffersv) {
 			f2i[i] = fft1out[i] * conjf(f1o[i]);
 	}
 	fftwf_execute(fft2plan);
-	printf("%d ",time(NULL));
+	
+	timediffs[0] = 0;
+	phasediffs[0] = 0;
+	if(sync_debug) 
+		printf("%d ",(int)time(NULL));
 	for(ri = 1; ri < nreceivers; ri++) {
 		fftwf_complex *f2o = fft2out  + (ri-1) * fft2n;
 		float maxmagsq = 0, phasedifference;
@@ -104,13 +111,39 @@ int sync_block(int blocksize, void **buffersv) {
 		timedifference = maxi;
 		timedifference += (y3-y1) / (2*(2*y2-y1-y3));
 		timedifference *= 1.0 / CORRELATION_OVERSAMPLE;
+		timediffs[ri] = timedifference;
 		
-		
-		phasedifference = 57.2957795f * cargf(maxc);
-		printf("%9.2f %E %6.2f  ", timedifference, maxmagsq, phasedifference);
+		phasediffs[ri] = phasedifference = cargf(maxc);
+		if(sync_debug)
+			printf("%9.2f %E %6.2f  ", timedifference, maxmagsq, 57.2957795 * phasedifference);
 	}
-	printf("\n");
-	fflush(stdout);
+	if(sync_debug) {
+		printf("\n");
+		fflush(stdout);
+	}
+	return 0;
+}
+
+
+/* synchronize and return pointers */
+int sync_blockp(int blocksize, void **buffersv, int *nsamples_ret, csample_t **buffersret, float *fracdiffs, float *phasediffs) {
+	float timediffs[NRECEIVERS_MAX] = {0};
+	int ri, ret;
+	csample_t **buffers = (csample_t**)buffersv;
+	
+	ret = sync_block(blocksize, buffersv, timediffs, phasediffs);
+	if(ret < 0) return ret;
+	
+	*nsamples_ret = blocksize/sizeof(csample_t) - corrlen*4;
+	for(ri = 0; ri < nreceivers; ri++) {
+		float td, td_int, td_frac;
+		td = timediffs[ri];
+		td_int = floor(td);
+		td_frac = td - td_int;
+		
+		buffersret[ri] = buffers[ri] + corrlen*2 - (int)td_int;
+		fracdiffs[ri] = td_frac;
+	}
 	return 0;
 }
 

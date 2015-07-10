@@ -4,6 +4,8 @@
 #include <semaphore.h>
 #include "dongles.h"
 
+static int coherent_debug = 0;
+
 static int ndongles=0, samprate=0, frequency=0, gain=0;
 static volatile int donglesok=0;
 
@@ -67,7 +69,7 @@ static void *dongle_f(void *arg) {
 			if(ret < 0) {
 			} else if(n_read < blocksize) {
 				fprintf(stderr, "Short read %d: %d/%d\n", ds->id, n_read, blocksize);
-			} else {
+			} else if(coherent_debug) {
 				fprintf(stderr, "Read %d\n", ds->id);
 			}
 		} else if(task == DONGLE_EXIT)
