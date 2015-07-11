@@ -1,3 +1,5 @@
+#define PURKKA1
+
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -38,7 +40,13 @@ static void *dongle_f(void *arg) {
 	rtlsdr_dev_t *dev = NULL;
 
 	fprintf(stderr, "Initializing %d\n", ds->id);
+#ifdef PURKKA1
+	CHECK1(rtlsdr_open(&dev, (ds->id + 1) % 3));
+#define trigger_id 2
+#else
 	CHECK1(rtlsdr_open(&dev, ds->id));
+#define trigger_id 0
+#endif
 	ds->dev = dev;
 	CHECK1(rtlsdr_set_sample_rate(dev, samprate));
 	CHECK1(rtlsdr_set_dithering(dev, 0));
@@ -125,8 +133,8 @@ int coherent_read(int blocksize, samples_t **buffers) {
 	}
 
 	/* generate some dummy I2C traffic to trigger noise source */
-	rtlsdr_set_tuner_gain(dongles[0].dev, gain-50);
-	rtlsdr_set_tuner_gain(dongles[0].dev, gain);
+	rtlsdr_set_tuner_gain(dongles[trigger_id].dev, gain-10);
+	rtlsdr_set_tuner_gain(dongles[trigger_id].dev, gain);
 
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_READ;

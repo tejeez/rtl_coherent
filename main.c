@@ -2,6 +2,16 @@
 #include "synchronize.h"
 #include <signal.h>
 #include <stdlib.h>
+#include <time.h>
+
+#define NRECEIVERS_MAX 16
+
+int ndongles = 3, blocksize = 1200000>>10<<10;
+int di;
+int readfromfile = 0, writetofile = 0, writetofile2 = 0;
+samples_t **buffers;
+FILE **files, **files2;
+
 
 volatile int do_exit = 0;
 static void sighandler(int signum) {
@@ -19,30 +29,55 @@ static void initsignals() {
 	sigaction(SIGPIPE, &sigact, NULL);
 }
 
-int main(int argc, char *argv[]) {
-	int ndongles = 3, blocksize = 1200000>>10<<10;
+
+static int dodsp(int blocksize, void **buffers) {
+	int nsamples = 0;
 	int di;
-	int readfromfile = 0, writetofile = 0;
-	samples_t **buffers;
-	FILE **files;
+	csample_t *bufs[NRECEIVERS_MAX];
+	float fracdiffs[NRECEIVERS_MAX], phasediffs[NRECEIVERS_MAX];
+	sync_blockp(blocksize, buffers, &nsamples, bufs, fracdiffs, phasediffs);
+	if(writetofile2) {
+		for(di = 0; di < ndongles; di++) {
+			fwrite(bufs[di], nsamples*sizeof(**bufs), 1, files2[di]);
+		}
+	}
+	//corr_block(blocksize);
+	return 0;
+}
+
+
+int main(int argc, char *argv[]) {
+	int timestamp = time(NULL);
 	if(argc >= 2) {
-		if(argv[1][0] == 'r')
+		if(argv[1][0] == 'r' && argc >= 3) {
 			readfromfile = 1;
+			timestamp = atoi(argv[2]);
+		}
 		if(argv[1][0] == 'w')
 			writetofile = 1;
+		if(argv[1][0] == 'W' || argv[1][1] == 'W')
+			writetofile2 = 1;
 	}
 	initsignals();
 	sync_init(ndongles, 16384);
 
 	buffers = malloc(ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));
+	files2 = malloc(ndongles * sizeof(*files2));
 	for(di=0; di < ndongles; di++) {
 		char t[32];
 		buffers[di] = malloc(blocksize * sizeof(**buffers));
-		sprintf(t, "d%02d", di);
 		if(readfromfile || writetofile) {
+			sprintf(t, "d%02d_%d", di, timestamp);
 			if((files[di] = fopen(t, readfromfile ? "rb" : "wb")) == NULL) {
 				fprintf(stderr, "Could not open file\n");
+				goto fail;
+			}
+		}
+		if(writetofile2) {
+			sprintf(t, "c%02d_%d", di, timestamp);
+			if((files2[di] = fopen(t, "wb")) == NULL) {
+				fprintf(stderr, "Could not open file2\n");
 				goto fail;
 			}
 		}
@@ -53,14 +88,14 @@ int main(int argc, char *argv[]) {
 				if(fread(buffers[di], blocksize, 1, files[di]) == 0)
 					goto fail;
 			}
-			sync_block(blocksize, (void**)buffers);
+			dodsp(blocksize, (void**)buffers);
 		}
 	} else {
-		coherent_init(ndongles, 2400000, 40e6, 400);
+		coherent_init(ndongles, 2400000, 434e6, 300);
 
 		while(do_exit == 0) {
 			coherent_read(blocksize, buffers);
-			sync_block(blocksize, (void**)buffers);
+			dodsp(blocksize, (void**)buffers);
 			if(writetofile) {
 				for(di = 0; di < ndongles; di++) {
 					fwrite(buffers[di], blocksize, 1, files[di]);
