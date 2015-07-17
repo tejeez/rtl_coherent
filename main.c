@@ -1,5 +1,6 @@
 #include "dongles.h"
 #include "synchronize.h"
+#include "correlate.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
@@ -41,7 +42,7 @@ static int dodsp(int blocksize, void **buffers) {
 			fwrite(bufs[di], nsamples*sizeof(**bufs), 1, files2[di]);
 		}
 	}
-	//corr_block(blocksize);
+	//corr_block(nsamples, bufs, fracdiffs, phasediffs);
 	return 0;
 }
 
@@ -60,6 +61,7 @@ int main(int argc, char *argv[]) {
 	}
 	initsignals();
 	sync_init(ndongles, 16384);
+	corr_init(ndongles, 32);
 
 	buffers = malloc(ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));

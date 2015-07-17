@@ -13,8 +13,8 @@ static int nreceivers=0, corrlen=0, fft1n=0, fft2n=0;
 
 static int sync_debug = 1;
 
-fftwf_complex *fft1in, *fft1out, *fft2in, *fft2out;
-fftwf_plan fft1plan, fft2plan;
+static fftwf_complex *fft1in, *fft1out, *fft2in, *fft2out;
+static fftwf_plan fft1plan, fft2plan;
 
 int sync_init(int nreceivers_init, int corrlen_init) {
 	int i, arraysize;
@@ -127,6 +127,7 @@ int sync_block(int blocksize, void **buffersv, float *timediffs, float *phasedif
 
 /* synchronize and return pointers */
 int sync_blockp(int blocksize, void **buffersv, int *nsamples_ret, csample_t **buffersret, float *fracdiffs, float *phasediffs) {
+	const int skipfirst = 32768;
 	float timediffs[NRECEIVERS_MAX] = {0};
 	int ri, ret;
 	csample_t **buffers = (csample_t**)buffersv;
@@ -134,14 +135,14 @@ int sync_blockp(int blocksize, void **buffersv, int *nsamples_ret, csample_t **b
 	ret = sync_block(blocksize, buffersv, timediffs, phasediffs);
 	if(ret < 0) return ret;
 	
-	*nsamples_ret = blocksize/sizeof(csample_t) - corrlen*4;
+	*nsamples_ret = blocksize/sizeof(csample_t) - corrlen*4 - skipfirst;
 	for(ri = 0; ri < nreceivers; ri++) {
 		float td, td_int, td_frac;
 		td = timediffs[ri];
 		td_int = floor(td);
 		td_frac = td - td_int;
 		
-		buffersret[ri] = buffers[ri] + corrlen*2 - (int)td_int;
+		buffersret[ri] = buffers[ri] + corrlen*2 - (int)td_int + skipfirst;
 		fracdiffs[ri] = td_frac;
 	}
 	return 0;
