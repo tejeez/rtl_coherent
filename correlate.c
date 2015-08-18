@@ -94,6 +94,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 	}
 	printf("%E %d\n", cvabssumbest, cvabssumbesti);
+	return 0;
 }
 
 

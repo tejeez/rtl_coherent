@@ -93,14 +93,16 @@ int main(int argc, char *argv[]) {
 			dodsp(blocksize, (void**)buffers);
 		}
 	} else {
-		coherent_init(ndongles, 2400000, 434e6, 300);
+		int donglesok = coherent_init(ndongles, 2400000, 434e6, 300);
 
-		while(do_exit == 0) {
-			coherent_read(blocksize, buffers);
-			dodsp(blocksize, (void**)buffers);
-			if(writetofile) {
-				for(di = 0; di < ndongles; di++) {
-					fwrite(buffers[di], blocksize, 1, files[di]);
+		if(donglesok == ndongles) {
+			while(do_exit == 0) {
+				if(coherent_read(blocksize, buffers) == -1) break;
+				dodsp(blocksize, (void**)buffers);
+				if(writetofile) {
+					for(di = 0; di < ndongles; di++) {
+						fwrite(buffers[di], blocksize, 1, files[di]);
+					}
 				}
 			}
 		}
