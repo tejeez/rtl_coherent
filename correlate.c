@@ -52,6 +52,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 	int cvabssumbesti = 0;
 	for(ci = 0; ci < covarsize; ci++) covar[ci] = 0;
 	
+	/* calculate covariance matrix for each frequency */
 	for(si = 0; si < blocksize-fft1n; si += windowstep) {
 		for(ri = 0; ri < nreceivers; ri++) {
 			csample_t *buf = buffers[ri] + si;
@@ -77,23 +78,37 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 			}
 		}
 	}
+
+	/* find the frequency with strongest correlation (for testing) */
+	ci = 0;
 	for(i = 0; i < fft1n; i++) {
 		float cvabssum = 0;
 		for(ri = 0; ri < nreceivers; ri++) {
 			for(ri2 = 0; ri2 < nreceivers; ri2++) {
-				if(ri != ri2) cvabssum += covar[ci];
-				//printf("%E %E  ", crealf(covar[ci]), cimagf(covar[ci]));
+				if(ri != ri2) cvabssum += cabsf(covar[ci]);
 				ci++;
 			}
-			//printf(" ");
 		}
-		//printf("\n");
 		if(cvabssum > cvabssumbest) {
 			cvabssumbest = cvabssum;
 			cvabssumbesti = i;
 		}
 	}
-	printf("%E %d\n", cvabssumbest, cvabssumbesti);
+	/* print covariance matrix for that frequency */
+	printf("\033[32m%E %d\033[1m\n", cvabssumbest, cvabssumbesti);
+
+	const int covarp = nreceivers*nreceivers;
+	ci = covarp * cvabssumbesti;
+	for(ri = 0; ri < nreceivers; ri++) {
+		for(ri2 = 0; ri2 < nreceivers; ri2++) {
+			int mag_dB = 10.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
+			int phase_deg = 57.2957795f*cargf(covar[ci]);
+			printf("%-4d %-4d   ", mag_dB, phase_deg);
+			ci++;
+		}
+		printf("    \n");
+	}
+	printf("\033[0m\n\033[H");
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-#define PURKKA1
+//#define PURKKA1
 
 #include <errno.h>
 #include <string.h>
@@ -143,7 +143,8 @@ int coherent_read(int blocksize, samples_t **buffers) {
 
 	for(di=0; di < donglesok; di++)
 		sem_wait(&dongle_sem);
-	fprintf(stderr, "Read all\n");
+	if(coherent_debug)
+		fprintf(stderr, "Read all\n");
 	
 	return 0;
 	err:

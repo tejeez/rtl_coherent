@@ -42,7 +42,7 @@ static int dodsp(int blocksize, void **buffers) {
 			fwrite(bufs[di], nsamples*sizeof(**bufs), 1, files2[di]);
 		}
 	}
-	//corr_block(nsamples, bufs, fracdiffs, phasediffs);
+	corr_block(nsamples, bufs, fracdiffs, phasediffs);
 	return 0;
 }
 
