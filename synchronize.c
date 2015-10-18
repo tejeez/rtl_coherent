@@ -53,9 +53,8 @@ int sync_init(int nreceivers_init, int corrlen_init) {
 }
 
 
-int sync_block(int blocksize, void **buffersv, float *timediffs, float *phasediffs) {
+int sync_block(int blocksize, csample_t **buffers, float *timediffs, float *phasediffs) {
 	int ri, i;
-	csample_t **buffers = (csample_t**)buffersv;
 	if(blocksize < corrlen) return -1;
 	
 	for(ri = 0; ri < nreceivers; ri++) {
@@ -126,16 +125,20 @@ int sync_block(int blocksize, void **buffersv, float *timediffs, float *phasedif
 
 
 /* synchronize and return pointers */
-int sync_blockp(int blocksize, void **buffersv, int *nsamples_ret, csample_t **buffersret, float *fracdiffs, float *phasediffs) {
-	const int skipfirst = 32768;
+int sync_blockp(int blocksize_samples, csample_t **buffers_in, int *nsamples_ret, csample_t **buffersret, float *fracdiffs, float *phasediffs) {
+	const int skipfirst = 32768, skipfirst_sync = 8192;
 	float timediffs[NRECEIVERS_MAX] = {0};
 	int ri, ret;
-	csample_t **buffers = (csample_t**)buffersv;
+	csample_t *buffers[NRECEIVERS_MAX];
+	for(ri = 0; ri < nreceivers; ri++) {
+		buffers[ri] = buffers_in[ri] + skipfirst_sync;
+	}
+	blocksize_samples -= skipfirst_sync;
 	
-	ret = sync_block(blocksize, buffersv, timediffs, phasediffs);
+	ret = sync_block(blocksize_samples, buffers, timediffs, phasediffs);
 	if(ret < 0) return ret;
 	
-	*nsamples_ret = blocksize/sizeof(csample_t) - corrlen*4 - skipfirst;
+	*nsamples_ret = blocksize_samples - corrlen*4 - skipfirst;
 	for(ri = 0; ri < nreceivers; ri++) {
 		float td, td_int, td_frac;
 		td = timediffs[ri];

@@ -36,7 +36,7 @@ static int dodsp(int blocksize, void **buffers) {
 	int di;
 	csample_t *bufs[NRECEIVERS_MAX];
 	float fracdiffs[NRECEIVERS_MAX], phasediffs[NRECEIVERS_MAX];
-	sync_blockp(blocksize, buffers, &nsamples, bufs, fracdiffs, phasediffs);
+	sync_blockp(blocksize / sizeof(csample_t), (csample_t**)buffers, &nsamples, bufs, fracdiffs, phasediffs);
 	if(writetofile2) {
 		for(di = 0; di < ndongles; di++) {
 			fwrite(bufs[di], nsamples*sizeof(**bufs), 1, files2[di]);
