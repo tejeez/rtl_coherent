@@ -80,9 +80,11 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 	}
 
 	/* find the frequency with strongest correlation (for testing) */
+#if 0
 	ci = 0;
 	for(i = 0; i < fft1n; i++) {
 		float cvabssum = 0;
+		//if(i == 31) continue;
 		for(ri = 0; ri < nreceivers; ri++) {
 			for(ri2 = 0; ri2 < nreceivers; ri2++) {
 				if(ri != ri2) cvabssum += cabsf(covar[ci]);
@@ -94,6 +96,9 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 			cvabssumbesti = i;
 		}
 	}
+#else
+	cvabssumbesti = 1;
+#endif
 	/* print covariance matrix for that frequency */
 	printf("\033[32m%E %d\033[1m\n", cvabssumbest, cvabssumbesti);
 
@@ -103,12 +108,24 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		for(ri2 = 0; ri2 < nreceivers; ri2++) {
 			int mag_dB = 10.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
 			int phase_deg = 57.2957795f*cargf(covar[ci]);
-			printf("%-4d %-4d   ", mag_dB, phase_deg);
+			printf("%-4d %-4d | ", mag_dB, phase_deg);
 			ci++;
 		}
 		printf("    \n");
 	}
 	printf("\033[0m\n\033[H");
+	//printf("\033[0m\n\f");
+
+	/* print the matrix in fifo */
+	ci = covarp * cvabssumbesti;
+	FILE *fi = fopen("fifo", "w");
+	for(ri = 0; ri < nreceivers; ri++) {
+		for(ri2 = 0; ri2 < nreceivers; ri2++) {
+			fprintf(fi, "%f%+fj\n", creal(covar[ci]), cimag(covar[ci]));
+			ci++;
+		}
+	}
+	fclose(fi);
 	return 0;
 }
 
