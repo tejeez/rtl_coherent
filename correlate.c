@@ -63,10 +63,23 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 		fftwf_execute(fft1plan);
 		for(ri = 0; ri < nreceivers; ri++) {
-			/* TODO phase slope for fractional delay */
-			float complex pd = cexpf(I * phasediffs[ri]);
-			for(i = 0; i < fft1n; i++)
-				fft1out[i] *= pd;
+			/* phase slope for fractional delay: */
+			float fds = -2*PIf * fracdiffs[ri] / fft1n;
+			/* optimization: don't calculate cexpf(I * fds * i) inside the loop */
+			float complex fdsc = cexpf(I * fds);
+			/* include correction for most negative frequency in pd first */
+			float complex pd = cexpf(I * (phasediffs[ri] - fds*fft1n/2));
+			
+			/* negative frequencies first */
+			for(i = fft1n/2; i < fft1n; i++) {
+				fft1out[fft1n*ri + i] *= pd;
+				pd *= fdsc;
+			}
+			/* positive frequencies */
+			for(i = 0; i < fft1n/2; i++) {
+				fft1out[fft1n*ri + i] *= pd;
+				pd *= fdsc;
+			}
 		}
 		ci = 0;
 		for(i = 0; i < fft1n; i++) {
@@ -80,7 +93,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 	}
 
 	/* find the frequency with strongest correlation (for testing) */
-#if 0
+#if 1
 	ci = 0;
 	for(i = 0; i < fft1n; i++) {
 		float cvabssum = 0;
