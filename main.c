@@ -7,7 +7,8 @@
 
 #define NRECEIVERS_MAX 16
 
-int ndongles = 3, blocksize = 1200000>>10<<10;
+//int ndongles = 3, blocksize = 1200000>>10<<10;
+int ndongles = 3, blocksize = 500000>>10<<10;
 int di;
 int readfromfile = 0, writetofile = 0, writetofile2 = 0;
 samples_t **buffers;
