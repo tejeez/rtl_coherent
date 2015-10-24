@@ -79,7 +79,11 @@ while 1:
 			cov_file.write(co)
 			if not i in indices:
 				continue
-			phases.append(cmath.phase(complex(co)))
+			try:
+				phases.append(cmath.phase(complex(co)))
+			except ValueError:
+				print("Value error:", co)
+				phases.append(0)
 		cov_file.write('\n')
 
 		corrs = []
