@@ -119,7 +119,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 	ci = covarp * cvabssumbesti;
 	for(ri = 0; ri < nreceivers; ri++) {
 		for(ri2 = 0; ri2 < nreceivers; ri2++) {
-			int mag_dB = 10.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
+			int mag_dB = 5.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
 			int phase_deg = 57.2957795f*cargf(covar[ci]);
 			printf("%-4d %-4d | ", mag_dB, phase_deg);
 			ci++;

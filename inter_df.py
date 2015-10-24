@@ -1,12 +1,14 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# -*- encoding: utf-8 -*-
 
 # plot covariance matrix
-
 
 import matplotlib.pyplot as plt
 import cmath
 import math
 import numpy
+import sys
+import time
 
 # Freq
 F = 434100000.0
@@ -20,10 +22,20 @@ LAMBDA = C / F
 #	(0.335,  0.235/2),
 #	(0.335, -0.235/2),
 #]
+#ANTENNAS = [
+#	(0.23, 0.235),
+#	(0, 0.235)
+#]
+
+# Pizza box equilateral
 ANTENNAS = [
-	(0.23, 0.235),
-	(0, 0.235)
+	(1, 0.1992, 0.115),
+	(2, 0.1992, -0.115),
+	(5, 0.0000, -0.23),
 ]
+invertphases = 1
+
+indices = [ind for ind, _, _ in ANTENNAS]
 
 n = 3
 nn = n*n
@@ -33,12 +45,12 @@ dirs = numpy.linspace(0, 2*math.pi, num=360)
 expected_phases = []
 for d in dirs:
 	phases_per_ant = []
-	for x, y in ANTENNAS:
+	for _, x, y in ANTENNAS:
 		#rotate
 		xnew = x * math.cos(d) - y * math.sin(d)
 		# ynew = y * math.cos(d) + y * math.sin(d)
 		# Ugly capping of phase but it's done only once
-		expected_phase = -cmath.phase(cmath.rect(1, xnew / LAMBDA * 2 * math.pi))
+		expected_phase = invertphases*cmath.phase(cmath.rect(1, xnew / LAMBDA * 2 * math.pi))
 		phases_per_ant.append(expected_phase)
 	expected_phases.append(phases_per_ant)
 
@@ -48,22 +60,27 @@ plt.figure(1, figsize=(16,12))
 
 plots = []
 sp = plt.subplot(1, 1, 1, polar=True)
-p, = sp.plot([0, 0], [0, n*2])
-maxind, = sp.plot([0, 0], [0, n*2])
+p, = sp.plot([0, 0], [0, (n-0)*2], linewidth=10)
+maxind, = sp.plot([0, 0], [0, (n-0)*2], linewidth=10)
 plots.append(p)
 #plt.show()
 plt.show(block = False)
 
+datestring = time.strftime("covs-%Y-%m-%dT%H:%M:%S.txt")
+cov_file = open(datestring, "w")
 
 while 1:
 	with open("fifo") as fifo:
+	
 		# phase differences for antennas 2..n
 		phases = []
 		for i in range(nn):
 			co = fifo.readline()
-			if i == 0 or i >= n:
+			cov_file.write(co)
+			if not i in indices:
 				continue
 			phases.append(cmath.phase(complex(co)))
+		cov_file.write('\n')
 
 		corrs = []
 		max_index = 0
