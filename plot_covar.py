@@ -17,8 +17,8 @@ for i in range(nn):
 	sp = plt.subplot(n, n, 1+i, polar=True)
 	p, = sp.plot([0, 0], [0, 50])
 	plots.append(p)
-#plt.show()
-plt.show(block = False)
+plt.ion() # helpful answer at http://stackoverflow.com/a/15720891 in the comment section
+plt.show()
 
 
 
@@ -33,7 +33,7 @@ while 1:
 			except ValueError:
 				r = 0
 
-			print(r)
+			print("[%d, %d]: r: % 2.3f, phi: % 3.4f" % (i/3, i%3, r, ph))
 	
 			r1 = [0, r]
 			ph1 = [ph, ph]
@@ -41,6 +41,4 @@ while 1:
 			plots[i].set_xdata(ph1)
 			plots[i].set_ydata(r1)
 		print("\n")
-		fifo.close()
-		plt.draw()
-
+	plt.pause(0.01)
