@@ -9,7 +9,7 @@ struct dongle_struct {
 	pthread_t dongle_t, control_t;
 };
 
-int coherent_init(int ndongles, int samprate, int frequency, int gain);
+int coherent_init();
 int coherent_read();
 int coherent_exit();
 

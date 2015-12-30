@@ -3,12 +3,12 @@
 #include <stdint.h>
 #include <time.h>
 #include <math.h>
+#include "configuration.h"
 #include "synchronize.h"
 
 /* for fractional-sample resolution */
 #define CORRELATION_OVERSAMPLE 4
 
-#define NRECEIVERS_MAX 16
 static int nreceivers=0, corrlen=0, fft1n=0, fft2n=0;
 
 static int sync_debug = 1;
@@ -16,10 +16,10 @@ static int sync_debug = 1;
 static fftwf_complex *fft1in, *fft1out, *fft2in, *fft2out;
 static fftwf_plan fft1plan, fft2plan;
 
-int sync_init(int nreceivers_init, int corrlen_init) {
+int sync_init() {
 	int i, arraysize;
-	nreceivers = nreceivers_init;
-	corrlen = corrlen_init;
+	nreceivers = conf.nreceivers;
+	corrlen = conf.sync_len;
 	if(nreceivers > NRECEIVERS_MAX) return -1;
 	
 	/* half of fft input will be zero-padded */
@@ -126,7 +126,7 @@ int sync_block(int blocksize, csample_t **buffers, float *timediffs, float *phas
 
 /* synchronize and return pointers */
 int sync_blockp(int blocksize_samples, csample_t **buffers_in, int *nsamples_ret, csample_t **buffersret, float *fracdiffs, float *phasediffs) {
-	const int skipfirst = 32768, skipfirst_sync = 8192;
+	const int skipfirst = conf.sync_end, skipfirst_sync = conf.sync_start;
 	float timediffs[NRECEIVERS_MAX] = {0};
 	int ri, ret;
 	csample_t *buffers[NRECEIVERS_MAX];

@@ -1,9 +1,8 @@
-//#define PURKKA1
-
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <semaphore.h>
+#include "configuration.h"
 #include "dongles.h"
 
 static int coherent_debug = 0;
@@ -40,19 +39,15 @@ static void *dongle_f(void *arg) {
 	rtlsdr_dev_t *dev = NULL;
 
 	fprintf(stderr, "Initializing %d\n", ds->id);
-#ifdef PURKKA1
-	CHECK1(rtlsdr_open(&dev, (ds->id + 1) % 3));
-#define trigger_id 2
-#else
-	CHECK1(rtlsdr_open(&dev, ds->id));
-#define trigger_id 0
-#endif
+
+	CHECK1(rtlsdr_open(&dev, ds->id + conf.firstdongle));
 	ds->dev = dev;
-	CHECK1(rtlsdr_set_sample_rate(dev, samprate));
+	CHECK1(rtlsdr_set_sample_rate(dev, conf.sample_rate));
 	CHECK1(rtlsdr_set_dithering(dev, 0));
-	CHECK1(rtlsdr_set_center_freq(dev, frequency));
+	CHECK1(rtlsdr_set_if_freq(dev, conf.if_freq));
+	CHECK1(rtlsdr_set_center_freq(dev, conf.center_freq));
 	CHECK1(rtlsdr_set_tuner_gain_mode(dev, 1));
-	CHECK1(rtlsdr_set_tuner_gain(dev, gain));
+	CHECK1(rtlsdr_set_tuner_gain(dev, conf.gain));
 	CHECK1(rtlsdr_reset_buffer(dev));
 
 	fprintf(stderr, "Initialized %d\n", ds->id);
@@ -94,12 +89,12 @@ static void *dongle_f(void *arg) {
 }
 
 
-int coherent_init(int init_ndongles, int init_samprate, int init_frequency, int init_gain) {
+int coherent_init() {
 	int di;
-	ndongles = init_ndongles;
-	samprate = init_samprate;
-	frequency = init_frequency;
-	gain = init_gain;
+	ndongles = conf.nreceivers;
+	samprate = conf.sample_rate;
+	frequency = conf.center_freq;
+	gain = conf.gain;
 	pthread_mutex_init(&dongle_m, NULL);
 	pthread_cond_init(&dongle_c, NULL);
 	sem_init(&dongle_sem, 0, 0);
@@ -133,8 +128,8 @@ int coherent_read(int blocksize, samples_t **buffers) {
 	}
 
 	/* generate some dummy I2C traffic to trigger noise source */
-	CHECK1(rtlsdr_set_tuner_gain(dongles[trigger_id].dev, gain-10));
-	CHECK1(rtlsdr_set_tuner_gain(dongles[trigger_id].dev, gain));
+	CHECK1(rtlsdr_set_tuner_gain(dongles[conf.trigger_id].dev, gain-10));
+	CHECK1(rtlsdr_set_tuner_gain(dongles[conf.trigger_id].dev, gain));
 
 	pthread_mutex_lock(&dongle_m);
 	dongle_task = DONGLE_READ;

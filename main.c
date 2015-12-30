@@ -1,3 +1,4 @@
+#include "configuration.h"
 #include "dongles.h"
 #include "synchronize.h"
 #include "correlate.h"
@@ -5,10 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define NRECEIVERS_MAX 16
-
-//int ndongles = 3, blocksize = 1200000>>10<<10;
-int ndongles = 3, blocksize = 500000>>10<<10;
+int ndongles = 0, blocksize = 0;
 int di;
 int readfromfile = 0, writetofile = 0, writetofile2 = 0;
 samples_t **buffers;
@@ -50,19 +48,27 @@ static int dodsp(int blocksize, void **buffers) {
 
 int main(int argc, char *argv[]) {
 	int timestamp = time(NULL);
-	if(argc >= 2) {
-		if(argv[1][0] == 'r' && argc >= 3) {
+	if(argc < 2) {
+	}
+	if(argc >= 3) {
+		if(argv[2][0] == 'r' && argc >= 4) {
 			readfromfile = 1;
-			timestamp = atoi(argv[2]);
+			timestamp = atoi(argv[3]);
 		}
-		if(argv[1][0] == 'w')
+		if(argv[2][0] == 'w')
 			writetofile = 1;
-		if(argv[1][0] == 'W' || argv[1][1] == 'W')
+		if(argv[2][0] == 'W' || argv[2][1] == 'W')
 			writetofile2 = 1;
 	}
 	initsignals();
-	sync_init(ndongles, 16384);
-	corr_init(ndongles, 32);
+	conf_read(argv[1]);
+	
+	/* TODO: get rid of these and make all the code read the configuration struct? */
+	ndongles = conf.nreceivers;
+	blocksize = conf.blocksize;
+
+	sync_init();
+	corr_init();
 
 	buffers = malloc(ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));
@@ -94,7 +100,7 @@ int main(int argc, char *argv[]) {
 			dodsp(blocksize, (void**)buffers);
 		}
 	} else {
-		int donglesok = coherent_init(ndongles, 2400000, 434e6, 300);
+		int donglesok = coherent_init(ndongles);
 
 		if(donglesok == ndongles) {
 			while(do_exit == 0) {

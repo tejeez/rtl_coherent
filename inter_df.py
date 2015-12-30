@@ -11,7 +11,7 @@ import sys
 import time
 
 # Freq
-F = 434100000.0
+F = 21000000.0
 # Measurements in metres
 C = 299792458.0
 LAMBDA = C / F 
@@ -27,11 +27,11 @@ LAMBDA = C / F
 #	(0, 0.235)
 #]
 
-# Pizza box equilateral
+# hf array
 ANTENNAS = [
-	(1, 0.1992, 0.115),
-	(2, 0.1992, -0.115),
-	(5, 0.0000, -0.23),
+	(1, 5, 0),
+	(2, 2.5, 4.33),
+	(5, -2.5, 4.33)
 ]
 invertphases = 1
 

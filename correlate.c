@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <math.h>
+#include "configuration.h"
 #include "correlate.h"
 
 #define PIf 3.14159265f
@@ -14,11 +15,11 @@ static fftwf_complex *fft1in, *fft1out, *covar;
 static float *fft1win;
 static fftwf_plan fft1plan;
 
-int corr_init(int nreceivers_init, int fft1n_init) {
+int corr_init() {
 	int i, arraysize;
-	nreceivers = nreceivers_init;
+	nreceivers = conf.nreceivers;
 	
-	fft1n = fft1n_init;
+	fft1n = conf.cor_fft;
 	
 	arraysize = nreceivers * fft1n;
 	fft1in  = fftwf_malloc(arraysize * sizeof(*fft1in));
@@ -63,12 +64,12 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 		fftwf_execute(fft1plan);
 		for(ri = 0; ri < nreceivers; ri++) {
-			/* phase slope for fractional delay: */
-			float fds = -2*PIf * fracdiffs[ri] / fft1n;
+			/* phase slope to approximate fractional delay: */
+			float fds = -2*PIf * (fracdiffs[ri] + conf.calibdelay[ri] * conf.sample_rate) / fft1n;
 			/* optimization: don't calculate cexpf(I * fds * i) inside the loop */
 			float complex fdsc = cexpf(I * fds);
 			/* include correction for most negative frequency in pd first */
-			float complex pd = cexpf(I * (phasediffs[ri] - fds*fft1n/2));
+			float complex pd = cexpf(I * (phasediffs[ri] - 2.f*M_PI * conf.calibdelay[ri] * conf.center_freq - fds*fft1n/2));
 			
 			/* negative frequencies first */
 			for(i = fft1n/2; i < fft1n; i++) {
@@ -92,6 +93,8 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 	}
 
+	/* TODO: send the covariances for all bins somewhere somehow */
+
 	/* find the frequency with strongest correlation (for testing) */
 #if 0
 	ci = 0;
@@ -110,7 +113,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 	}
 #else
-	cvabssumbesti = 1;
+	cvabssumbesti = 0;
 #endif
 	/* print covariance matrix for that frequency */
 	printf("\033[32m%E %d \033[1m\n", cvabssumbest, cvabssumbesti);
