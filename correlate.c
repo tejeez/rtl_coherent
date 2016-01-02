@@ -5,13 +5,15 @@
 #include <math.h>
 #include "configuration.h"
 #include "correlate.h"
+#include "df.h"
 
 #define PIf 3.14159265f
 
 static int nreceivers=0, fft1n=0, covarsize=0;
 
 
-static fftwf_complex *fft1in, *fft1out, *covar;
+static fftwf_complex *fft1in, *fft1out;
+static float complex *covar;
 static float *fft1win;
 static fftwf_plan fft1plan;
 
@@ -49,8 +51,6 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 	int ri, ri2, ci, i;
 	int si;
 	int windowstep = fft1n / 2; /* 50% overlap */
-	float cvabssumbest = 0;
-	int cvabssumbesti = 0;
 	for(ci = 0; ci < covarsize; ci++) covar[ci] = 0;
 	
 	/* calculate covariance matrix for each frequency */
@@ -93,10 +93,14 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 	}
 
-	/* TODO: send the covariances for all bins somewhere somehow */
+	df_block(covar);
 
-	/* find the frequency with strongest correlation (for testing) */
+
 #if 0
+#if 0
+	float cvabssumbest = 0;
+	int cvabssumbesti = 0;
+	/* find the frequency with strongest correlation (for testing) */
 	ci = 0;
 	for(i = 0; i < fft1n; i++) {
 		float cvabssum = 0;
@@ -144,6 +148,7 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 		fclose(fi);
 	}
+#endif
 	return 0;
 }
 

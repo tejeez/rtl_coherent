@@ -2,6 +2,7 @@
 #include "dongles.h"
 #include "synchronize.h"
 #include "correlate.h"
+#include "df.h"
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
@@ -99,6 +100,7 @@ int main(int argc, char *argv[]) {
 
 	sync_init();
 	corr_init();
+	df_init();
 
 	buffers = malloc(nbuffers * ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));
@@ -143,15 +145,17 @@ int main(int argc, char *argv[]) {
 					if(coherent_read(blocksize, buffers + ndongles * nbuf_write) == -1) break;
 					nbuf_write = nbuf_write_next;
 				} else {
-					fprintf(stderr,"Buffer overflow!");
-					sleep(1); /* TODO: proper synchronization */
+					fprintf(stderr,"\rBuffer overflow!");
+					usleep(100000); /* TODO: proper synchronization */
 				}
 
 			}
 		}
+		coherent_exit();
+
+		pthread_kill(dspthread, SIGINT);
 		pthread_join(dspthread, NULL);
 
-		coherent_exit();
 	}
 	fail:
 	sync_exit();
