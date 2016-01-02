@@ -5,8 +5,9 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
-int ndongles = 0, blocksize = 0;
+int ndongles = 0, blocksize = 0, nbuffers = 0;
 int di;
 int readfromfile = 0, writetofile = 0, writetofile2 = 0;
 samples_t **buffers;
@@ -46,6 +47,34 @@ static int dodsp(int blocksize, void **buffers) {
 }
 
 
+
+/*
+DSP and dongle control are done in separate threads to make it possible to be
+reading the next block while the previous block is being processed.
+There's a simple lockless queue between the threads.
+*/
+static volatile int nbuf_write=0, nbuf_read=0;
+pthread_t dspthread;
+
+static void *dspthread_f(void *arg) {
+	int nbuf_r = nbuf_read;
+	(void)arg;
+	while(!do_exit) {
+		while(nbuf_r != nbuf_write) { /* data waiting in buffers? */
+			dodsp(blocksize, (void**)(buffers + ndongles * nbuf_r));
+			if(writetofile) {
+				for(di = 0; di < ndongles; di++) {
+					fwrite(buffers[di], blocksize, 1, files[di]);
+				}
+			}
+			nbuf_read = nbuf_r = (nbuf_r + 1) % nbuffers;
+		}
+		usleep(100000); /* TODO: proper synchronization */
+	}
+	return NULL;
+}
+
+
 int main(int argc, char *argv[]) {
 	int timestamp = time(NULL);
 	if(argc < 2) {
@@ -65,17 +94,21 @@ int main(int argc, char *argv[]) {
 	
 	/* TODO: get rid of these and make all the code read the configuration struct? */
 	ndongles = conf.nreceivers;
+	nbuffers = conf.nbuffers;
 	blocksize = conf.blocksize;
 
 	sync_init();
 	corr_init();
 
-	buffers = malloc(ndongles * sizeof(*buffers));
+	buffers = malloc(nbuffers * ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));
 	files2 = malloc(ndongles * sizeof(*files2));
+	
+	for(di=0; di < ndongles * nbuffers; di++)
+		buffers[di] = malloc(blocksize * sizeof(**buffers));
+	
 	for(di=0; di < ndongles; di++) {
 		char t[32];
-		buffers[di] = malloc(blocksize * sizeof(**buffers));
 		if(readfromfile || writetofile) {
 			sprintf(t, "d%02d_%d", di, timestamp);
 			if((files[di] = fopen(t, readfromfile ? "rb" : "wb")) == NULL) {
@@ -101,18 +134,22 @@ int main(int argc, char *argv[]) {
 		}
 	} else {
 		int donglesok = coherent_init(ndongles);
+		pthread_create(&dspthread, NULL, dspthread_f, NULL);
 
 		if(donglesok == ndongles) {
 			while(do_exit == 0) {
-				if(coherent_read(blocksize, buffers) == -1) break;
-				dodsp(blocksize, (void**)buffers);
-				if(writetofile) {
-					for(di = 0; di < ndongles; di++) {
-						fwrite(buffers[di], blocksize, 1, files[di]);
-					}
+				int nbuf_write_next = (nbuf_write + 1) % nbuffers;
+				if(nbuf_write_next != nbuf_read) { /* buffers free? */
+					if(coherent_read(blocksize, buffers + ndongles * nbuf_write) == -1) break;
+					nbuf_write = nbuf_write_next;
+				} else {
+					fprintf(stderr,"Buffer overflow!");
+					sleep(1); /* TODO: proper synchronization */
 				}
+
 			}
 		}
+		pthread_join(dspthread, NULL);
 
 		coherent_exit();
 	}

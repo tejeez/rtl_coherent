@@ -28,6 +28,7 @@ int conf_read(const char *filename) {
 		r = sscanf(line, "%31s %31s", a, b);
 		if(r == 2) {
 			CONF_INT(nreceivers)
+			CONF_INT(nbuffers)
 			CONF_INT(firstdongle)
 			CONF_INT(trigger_id)
 			CONF_INT(blocksize)

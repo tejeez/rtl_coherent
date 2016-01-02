@@ -3,6 +3,7 @@
 
 struct configuration {
 	int nreceivers;
+	int nbuffers; /* Number of buffers to allocate for the queue between dongle control and DSP threads */
 
 	/* RTL-SDR configuration */
 	uint32_t firstdongle; /* rtlsdr index of the first dongle to use */
