@@ -5,6 +5,7 @@ The code is quite ugly but it works.
 
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include <SDL/SDL.h>
 
 #define NBINS_MAX 8192
@@ -17,39 +18,68 @@ struct df_result {
 };
 
 
+SDL_Surface *sdls;
+void savebmp() {
+	int t = time(NULL);
+	char fn[100];
+	if(sdls == NULL) return;
+	sprintf(fn,"img/%d.bmp", t);
+	SDL_SaveBMP(sdls, fn);
+}
+
+
+
 int main() {
-	SDL_Surface *sdls;
 	SDL_Event sdle;
 	FILE *resultfile;
 	struct df_result *df_results;
 	int screenw = 1024, screenh = 400;
-	int sy = 0;
+	int sy = screenh-1;
 
 	float hues[NDIRS][3];
 	int i;
 	/* precalculate values for conversion from "HSV" */
-	//const float b_red = 0.8f, b_green = 0.7f, b_blue = 1.0f;
-	const float b_red = 0.9f, b_green = 0.8f, b_blue = 1.0f;
-	/* red to green */
-	for(i = 0; i < NDIRS/3; i++) {
-		float h = (float)i / (NDIRS/3);
+	/* red to yellow */
+	for(i = 0; i < NDIRS/6; i++) {
+		float h = (float)i / (NDIRS/6);
 		hues[i][0] = 0;
-		hues[i][1] = h * b_green;
-		hues[i][2] = (1-h) * b_red;
+		hues[i][1] = h;
+		hues[i][2] = 1;
 	}
-	/* green to blue */
-	for(; i < NDIRS/3*2; i++) {
-		float h = (float)(i - NDIRS/3) / (NDIRS/3);
-		hues[i][0] = h * b_blue;
-		hues[i][1] = (1-h) * b_green;
+	/* yellow to green */
+	for(; i < NDIRS*2/6; i++) {
+		float h = (float)(i - NDIRS/6) / (NDIRS/6);
+		hues[i][0] = 0;
+		hues[i][1] = 1;
+		hues[i][2] = 1.f-h;
+	}
+	/* green to cyan */
+	for(; i < NDIRS*3/6; i++) {
+		float h = (float)(i - NDIRS*2/6) / (NDIRS/6);
+		hues[i][0] = h;
+		hues[i][1] = 1;
 		hues[i][2] = 0;
 	}
-	/* blue to red */
-	for(; i < NDIRS; i++) {
-		float h = (float)(i - NDIRS/3*2) / (NDIRS/3);
-		hues[i][0] = (1-h) * b_blue;
+	/* cyan to blue */
+	for(; i < NDIRS*4/6; i++) {
+		float h = (float)(i - NDIRS*3/6) / (NDIRS/6);
+		hues[i][0] = 1;
+		hues[i][1] = 1.f-h;
+		hues[i][2] = 0;
+	}
+	/* blue to magenta */
+	for(; i < NDIRS*5/6; i++) {
+		float h = (float)(i - NDIRS*4/6) / (NDIRS/6);
+		hues[i][0] = 1;
 		hues[i][1] = 0;
-		hues[i][2] = h * b_red;
+		hues[i][2] = h;
+	}
+	/* magenta to red */
+	for(; i < NDIRS; i++) {
+		float h = (float)(i - NDIRS*5/6) / (NDIRS/6);
+		hues[i][0] = 1.f-h;
+		hues[i][1] = 0;
+		hues[i][2] = 1;
 	}
 
 
@@ -117,9 +147,11 @@ int main() {
 			struct df_result maxres = {0,0,0};
 			for(x2 = 0; x2 < binspp; x2++) {
 				struct df_result res;
-				/* find the bin with best DF result */
 				res = df_results[(x * binspp + x2 + nbins/2)%nbins];
-				if(res.corr > maxres.corr) {
+				/* find the bin with best DF result */
+				/*if(res.corr > maxres.corr) {*/
+				/* find the bin with most power */
+				if(res.power > maxres.power) {
 					maxres = res;
 				}
 			}
@@ -129,7 +161,7 @@ int main() {
 			}
 
 			//float brightness = ((logf(maxres.power) - avgpower[x]) + 2.0f) * 50.0f;
-			float brightness = ((logf(maxres.power * avgpower[x])) + 2.0f) * 50.0f;
+			float brightness = ((logf(maxres.power * avgpower[x])) + 0.5f) * 80.0f;
 			//printf("%f %f\n", maxres.power, avgpower[x]);
 			if(brightness < 0) brightness = 0;
 			if(brightness > 255.0f) brightness = 255.0f;
@@ -155,10 +187,12 @@ int main() {
 			}
 			p += 4;
 		}
-		sy--;
-		if(sy < 0) sy = screenh-1;
-
 		SDL_Flip(sdls);
+		sy--;
+		if(sy < 0) {
+			sy = screenh-1;
+			savebmp();
+		}
 
 		while(SDL_PollEvent(&sdle)) {
 			if(sdle.type == SDL_QUIT) goto fail;
@@ -171,6 +205,7 @@ int main() {
 	}
 
 	fail:
+	savebmp();
 	SDL_Quit();
 	return 0;
 }
