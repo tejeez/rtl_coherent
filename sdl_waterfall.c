@@ -141,7 +141,7 @@ int main() {
 			avgpower[x] = avgfilter;
 		}
 
-		/* Draw a line in the waterfall */
+		/* Draw a result line in the waterfall */
 		Uint8 *p = sdls->pixels + sdls->pitch * sy;
 		for(x = 0; x < ww; x++) {
 			struct df_result maxres = {0,0,0};
@@ -187,12 +187,23 @@ int main() {
 			}
 			p += 4;
 		}
-		SDL_Flip(sdls);
+		
 		sy--;
 		if(sy < 0) {
 			sy = screenh-1;
 			savebmp();
 		}
+
+		// Draw a red indicator line where the next sample will be
+		p = sdls->pixels + sdls->pitch * sy;
+		for(x = 0; x < ww * 4; x += 4) {
+			p[x] = 0;
+			p[x + 1] = 0;
+			p[x + 2] = 255;
+			p[x + 3] = 0; // Alpha? Needed?
+		}
+
+		SDL_Flip(sdls);
 
 		while(SDL_PollEvent(&sdle)) {
 			if(sdle.type == SDL_QUIT) goto fail;
