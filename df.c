@@ -5,7 +5,7 @@
 #include "configuration.h"
 #include "df.h"
 
-//#define NPAIRS_MAX 16
+#define NPAIRS_MAX 16
 #define NDIRS 64
 
 
@@ -22,12 +22,9 @@ struct df_result {
 };
 
 
-static int npairs = 3; /* number of antenna pairs */
-static const struct antennapair pairs[/*NPAIRS_MAX*/] = {
-{1, 5, 0},
-{2, 2.5, 4.33},
-{5, -2.5, 4.33}
-};
+static int npairs = 0; /* number of antenna pairs */
+
+static struct antennapair pairs[NPAIRS_MAX] = {{0,0,0}};
 static float complex *expected; /* expected phase offsets per every direction */
 
 static struct df_result *df_results;
@@ -35,11 +32,29 @@ static FILE *resultfile;
 
 int df_init() {
 	int idir, ipair;
+	const int nrx = conf.nreceivers;
 	float lambda = 299792458.0f / conf.center_freq;
-	expected = malloc(sizeof(*expected) * NDIRS * npairs);
+	expected = malloc(sizeof(*expected) * NDIRS * NPAIRS_MAX);
 	df_results = malloc(sizeof(*df_results) * conf.cor_fft);
+
+	npairs = 0;
+	int ant_i, ant_j;
+	for(ant_j = 0; ant_j < nrx; ant_j++) {
+		for(ant_i = ant_j+1; ant_i < nrx; ant_i++) {
+			float dx, dy;
+			int matrixij = ant_j * nrx + ant_i;
+			dx = conf.antennax[ant_j] - conf.antennax[ant_i];
+			dy = conf.antennay[ant_i] - conf.antennay[ant_j];
+			pairs[npairs] = (struct antennapair){matrixij, dx, dy};
+			printf("%d %f %f\n", matrixij, dx, dy);
+			npairs++;
+			if(npairs >= NPAIRS_MAX) break;
+		}
+	}
+
 	for(idir = 0; idir < NDIRS; idir++) {
 		float d = 2.0f * M_PI * idir / NDIRS;
+
 		for(ipair = 0; ipair < npairs; ipair++) {
 			float x, y, xnew;
 			x = pairs[ipair].x;

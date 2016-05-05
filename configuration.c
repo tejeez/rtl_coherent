@@ -48,6 +48,13 @@ int conf_read(const char *filename) {
 				snprintf(acmp, 31, "calibdelay%d", i);
 				if(strcmp(a, acmp) == 0)
 					conf.calibdelay[i] = atof(b);
+				snprintf(acmp, 31, "antennaxy%d", i);
+				if(strcmp(a, acmp) == 0) {
+					float x=0, y=0;
+					sscanf(b, "%f,%f", &x, &y);
+					conf.antennax[i] = x;
+					conf.antennay[i] = y;
+				}
 			}
 		}
 	}
