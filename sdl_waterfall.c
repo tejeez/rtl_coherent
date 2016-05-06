@@ -6,6 +6,7 @@ The code is quite ugly but it works.
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <assert.h>
 #include <SDL/SDL.h>
 
 #define NBINS_MAX 8192
@@ -33,7 +34,7 @@ int main() {
 	SDL_Event sdle;
 	FILE *resultfile;
 	struct df_result *df_results;
-	int screenw = 1024, screenh = 400;
+	int screenw = 1024, screenh = 400, screenh2 = 2*NDIRS;
 	int sy = screenh-1;
 
 	float hues[NDIRS][3];
@@ -89,7 +90,7 @@ int main() {
 
 	
 	SDL_Init(SDL_INIT_VIDEO);
-	sdls = SDL_SetVideoMode(screenw, screenh, 32, SDL_SWSURFACE);
+	sdls = SDL_SetVideoMode(screenw, screenh+screenh2, 32, SDL_SWSURFACE);
 	if(sdls == NULL) goto fail;
 
 	for(;;) {
@@ -104,12 +105,14 @@ int main() {
 			}
 		} while(c != 'R');
 		/* read size of array */
-		fread(&nbins, sizeof(int), 1, resultfile);
+		if(fread(&nbins, sizeof(int), 1, resultfile) == 0)
+			break;
 		if(nbins <= 0 || nbins > NBINS_MAX) {
 			fprintf(stderr, "Read invalid nbins\n");
 			continue;
 		}
-		fread(df_results, nbins*sizeof(*df_results), 1, resultfile);
+		if(fread(df_results, nbins*sizeof(*df_results), 1, resultfile) == 0)
+			break;
 		
 		/* bins per pixel. round up */
 		binspp = (nbins + screenw-1) / screenw;
@@ -143,6 +146,7 @@ int main() {
 
 		/* Draw a result line in the waterfall */
 		Uint8 *p = sdls->pixels + sdls->pitch * sy;
+		Uint8 *p2 = sdls->pixels + sdls->pitch * screenh;
 		for(x = 0; x < ww; x++) {
 			struct df_result maxres = {0,0,0};
 			for(x2 = 0; x2 < binspp; x2++) {
@@ -185,7 +189,16 @@ int main() {
 				else if(v < 0) p[i] = 0;
 				else p[i] = v;
 			}
+			int pt = sdls->pitch;
+			int h = 50.0f - (30.0f/255.0f) * brightness;
+			assert(h >= 0 && h < NDIRS);
+			Uint8 *p2p = &p2[pt * 2 * maxres.dir];
+			p2p[0] = p2p[pt]   = 255.0f * hues[h][0];
+			p2p[1] = p2p[pt+1] = 255.0f * hues[h][1];
+			p2p[2] = p2p[pt+2] = 255.0f * hues[h][2];
+			
 			p += 4;
+			p2 += 4;
 		}
 		
 		sy--;
@@ -207,6 +220,21 @@ int main() {
 
 		while(SDL_PollEvent(&sdle)) {
 			if(sdle.type == SDL_QUIT) goto fail;
+		}
+
+		/* fade */
+		int y;
+		for(y = screenh; y < screenh+screenh2; y++) {
+			Uint8 *p = sdls->pixels + sdls->pitch * y;
+			for(x = 0; x < ww; x++) {
+				p[0] -= p[0]>>4;
+				p[1] -= p[1]>>4;
+				p[2] -= p[2]>>4;
+				/*if(p[0] > 0) p[0]--;
+				if(p[1] > 0) p[1]--;
+				if(p[2] > 0) p[2]--;*/
+				p += 4;
+			}
 		}
 	}
 	ready:
