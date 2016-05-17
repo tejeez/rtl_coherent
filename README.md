@@ -45,9 +45,8 @@ them there for some time after the I2C traffic has finished. The idea is to
 have the noise burst triggered every time the center frequency is changed
 which should make fast scanning easier.
 
-I haven't even drawn a proper schematic of the whole hardware but I'll try
-to draw and publish it soon.
-
+A crude schematic of simple prototype hardware is now available in
+[hardware/simple/](hardware/simple/README.md).
 
 Software
 --------
