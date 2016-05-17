@@ -20,3 +20,6 @@ software...)
 
 One of USB data lines is used as the noise source.
 It's not the best way but somewhat works.
+
+Here's picture of the hardware to help understand how it's actually built:
+![Picture of the hardware](picture.jpg)
