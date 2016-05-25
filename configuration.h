@@ -24,6 +24,7 @@ struct configuration {
 	/* Correlation of antenna signals */
 	int cor_fft; /* FFT size. Number of frequency bins. */
 	float calibdelay[NRECEIVERS_MAX]; /* extra delay to add (in seconds). This is used to correct for cable skew. */
+	int calibrationmode;
 
 	/* Direction finding */
 	float antennax[NRECEIVERS_MAX], antennay[NRECEIVERS_MAX];

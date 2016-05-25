@@ -78,8 +78,8 @@ static void *dspthread_f(void *arg) {
 
 int main(int argc, char *argv[]) {
 	int timestamp = time(NULL);
-	if(argc < 2) {
-	}
+	int i;
+	/* TODO: properly parse command line arguments */
 	if(argc >= 3) {
 		if(argv[2][0] == 'r' && argc >= 4) {
 			readfromfile = 1;
@@ -92,6 +92,9 @@ int main(int argc, char *argv[]) {
 	}
 	initsignals();
 	conf_read(argv[1]);
+	for(i = 2; i < argc; i++) {
+		if(argv[i][0] == 'c') conf.calibrationmode = 1;
+	}
 	
 	/* TODO: get rid of these and make all the code read the configuration struct? */
 	ndongles = conf.nreceivers;
@@ -100,7 +103,7 @@ int main(int argc, char *argv[]) {
 
 	sync_init();
 	corr_init();
-	df_init();
+	if(!conf.calibrationmode) df_init();
 
 	buffers = malloc(nbuffers * ndongles * sizeof(*buffers));
 	files = malloc(ndongles * sizeof(*files));

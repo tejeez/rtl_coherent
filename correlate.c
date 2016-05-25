@@ -93,62 +93,61 @@ int corr_block(int blocksize, csample_t **buffers, float *fracdiffs, float *phas
 		}
 	}
 
-	df_block(covar);
-
-
-#if 0
-#if 0
-	float cvabssumbest = 0;
-	int cvabssumbesti = 0;
-	/* find the frequency with strongest correlation (for testing) */
-	ci = 0;
-	for(i = 0; i < fft1n; i++) {
-		float cvabssum = 0;
-		//if(i == 31) continue;
-		for(ri = 0; ri < nreceivers; ri++) {
-			for(ri2 = 0; ri2 < nreceivers; ri2++) {
-				if(ri != ri2) cvabssum += cabsf(covar[ci]);
-				ci++;
+	if(!conf.calibrationmode) {
+		df_block(covar);
+	} else {
+		/* calibration mode:
+		find the frequency with strongest correlation
+		and print its covariance matrix */
+		float cvabssumbest = 0;
+		int cvabssumbesti = 0;
+		/* find the frequency with strongest correlation (for testing) */
+		ci = 0;
+		for(i = 0; i < fft1n; i++) {
+			float cvabssum = 0;
+			//if(i == 31) continue;
+			for(ri = 0; ri < nreceivers; ri++) {
+				for(ri2 = 0; ri2 < nreceivers; ri2++) {
+					if(ri != ri2) cvabssum += cabsf(covar[ci]);
+					ci++;
+				}
+			}
+			if(cvabssum > cvabssumbest) {
+				cvabssumbest = cvabssum;
+				cvabssumbesti = i;
 			}
 		}
-		if(cvabssum > cvabssumbest) {
-			cvabssumbest = cvabssum;
-			cvabssumbesti = i;
-		}
-	}
-#else
-	cvabssumbesti = 0;
-#endif
-	/* print covariance matrix for that frequency */
-	printf("\033[32m%E %d \033[1m\n", cvabssumbest, cvabssumbesti);
+		/* print covariance matrix for that frequency */
+		printf("\033[32m%E %d \033[1m\n", cvabssumbest, cvabssumbesti);
 
-	const int covarp = nreceivers*nreceivers;
-	ci = covarp * cvabssumbesti;
-	for(ri = 0; ri < nreceivers; ri++) {
-		for(ri2 = 0; ri2 < nreceivers; ri2++) {
-			int mag_dB = 5.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
-			int phase_deg = 57.2957795f*cargf(covar[ci]);
-			printf("%-4d %-4d | ", mag_dB, phase_deg);
-			ci++;
-		}
-		printf("    \n");
-	}
-	printf("\033[0m\n\033[H");
-	//printf("\033[0m\n\f");
-
-	/* print the matrix in fifo */
-	ci = covarp * cvabssumbesti;
-	FILE *fi = fopen("fifo", "w");
-	if(fi) {
+		const int covarp = nreceivers*nreceivers;
+		ci = covarp * cvabssumbesti;
 		for(ri = 0; ri < nreceivers; ri++) {
 			for(ri2 = 0; ri2 < nreceivers; ri2++) {
-				fprintf(fi, "%f%+fj\n", creal(covar[ci]), cimag(covar[ci]));
+				int mag_dB = 5.0 * log10f(crealf(covar[ci])*crealf(covar[ci]) + cimagf(covar[ci])*cimagf(covar[ci]));
+				int phase_deg = 57.2957795f*cargf(covar[ci]);
+				printf("%-4d %-4d | ", mag_dB, phase_deg);
 				ci++;
 			}
+			printf("    \n");
 		}
-		fclose(fi);
+		printf("\033[0m\n\033[H");
+		//printf("\033[0m\n\f");
+		#if 0
+		/* print the matrix in fifo */
+		ci = covarp * cvabssumbesti;
+		FILE *fi = fopen("fifo", "w");
+		if(fi) {
+			for(ri = 0; ri < nreceivers; ri++) {
+				for(ri2 = 0; ri2 < nreceivers; ri2++) {
+					fprintf(fi, "%f%+fj\n", creal(covar[ci]), cimag(covar[ci]));
+					ci++;
+				}
+			}
+			fclose(fi);
+		}
+		#endif
 	}
-#endif
 	return 0;
 }
 
